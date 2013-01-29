@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+
+    <title>Aura by jhaygood86</title>
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <h1>Aura</h1>
+        <h2>Aura Library for .NET -- Extends the MongoDB .NET driver to make your life easier</h2>
+
+        <section id="downloads">
+          <a href="https://github.com/jhaygood86/aura/zipball/master" class="btn">Download as .zip</a>
+          <a href="https://github.com/jhaygood86/aura/tarball/master" class="btn">Download as .tar.gz</a>
+          <a href="https://github.com/jhaygood86/aura" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <h1>Aura Project</h1>
+
+<p>Welcome! Aura is a very simple wrapper library for 10gen's <a href="http://www.mongodb.org/display/DOCS/CSharp+Language+Center">Official MongoDB C#/.NET Driver</a> that helps shortcut some repetitive tasks when building applications that use MongoDB to store documents in strongly-typed collections.</p>
+
+<h2>Quick Start</h2>
+
+<p>The easiest way to get started with Aura is to</p>
+
+<ol>
+<li>Checkout Aura (builds will be available soon!) and build it</li>
+<li>Ad Aura as a dependency</li>
+<li>Have a mongodb:// connection string in your connectionStrings
+<code>
+&lt;connectionStrings&gt;
+&lt;add key="MyCoolMongoDatabase" value="mongodb://hostname/database" /&gt; 
+&lt;/connectionStrings&gt;
+</code>
+</li>
+<li>Create the classes that you wish to store and retrieve with MongoDB.  This can be done of two ways:
+
+<ul>
+<li>Create your own POCO classes and add the [BsonId] attribute to your uniquely identifying field if it isn't  called Id, id, or _id.
+<code>
+public class Person {
+[BsonId]
+public Guid PersonId { get; set; }
+public string Name { get; set; }
+}
+</code>
+</li>
+<li>Inherit from <strong><em>Aura.Record</em></strong> or <strong><em>Aura.TimestampedRecord</em></strong> which already has an Id with an associated autogenerator
+<code>
+[BsonId(IdGenerator = typeof(StringObjectIdGenerator))]
+public virtual string Id { get; set; }
+</code>
+</li>
+</ul>
+</li>
+</ol><p>Now you can create an instance of <strong>RecordManager&lt;Person&gt;</strong> and go to town.  For example:</p>
+
+<pre><code>    var personManager = new RecordManager&lt;Person&gt;();
+    Person person = personManager.GetById(person.Id);
+    person.Name = "Updated Name";
+    personManager.Save(person);
+</code></pre>
+
+<h2>What Aura <em>does not</em> do</h2>
+
+<p>Aura does not promise to take out your trash or walk you dog. If it improves your marriage, then it's probably just because it saved you a few extra minutes at work. </p>
+
+<p>Everything that can be done with Aura can be done directly using the 10Gen Driver.  Aura simply wraps some of the common operations I found myself repeating and makes some of those repetitive tasks a little bit less... repetitive... :) </p>
+
+<p>Aura also provides some <em>very limited</em> prescriptive guidance when starting up a new project using MongoDB. </p>
+
+<h2>What Aura <em>does</em> do</h2>
+
+<p>Aura provides a few features on top of the MongoDB driver, all of which can be used independently of each other.  Feel free to use the features you want and ignore the rest, Aura won't get it's feelings hurt.</p>
+
+<p>Features offered by Aura:</p>
+
+<ul>
+<li>A simple <a href="http://martinfowler.com/eaaCatalog/repository.html">Repository Pattern</a> wrapper for MongoDB collections exposing the most common CRUD functionality for strongly typed documents </li>
+</ul><pre><code>internal class PersonManager : RecordManager&lt;Person&gt; {
+    // Public methods inherited from RecordManager&lt;T&gt;
+    IQueryable&lt;T&gt; AsQueryable { get; }
+    void DeleteById(object id);
+    T GetById(object id);
+    IEnumerable&lt;T&gt; GetManyByIds(IEnumerable&lt;object&gt; ids);
+    bool Save(T record);
+    void BatchInsert(IEnumerable&lt;T&gt; records);
+
+    // Protected methods inherited from RecordManager&lt;T&gt;
+    long Count(IMongoQuery criteria = null);
+    IEnumerable&lt;T&gt; Find(IMongoQuery criteria, IMongoSortBy sort = null, int? skip = null, int? limit = null);
+    T FindSingle(IMongoQuery criteria);
+    void Initialize(); // For once-per application runtime maintenance like Ensuring Indexes, Purging Data, Setting Conventions
+    void DropCollection();
+    T FindOneAndModify(IMongoQuery criteria, IMongoUpdate update, IMongoSortBy sortBy = null, bool returnModifiedVersion = true);
+    T FindOneAndRemove(IMongoQuery criteria, IMongoSortBy sortBy = null);
+    IEnumerable&lt;T&gt; EnumerateAndModify(IMongoQuery criteria, IMongoUpdate update, IMongoSortBy sortBy = null, bool returnModifiedVersion = true);
+    IEnumerable&lt;T&gt; EnumerateAndRemove(IMongoQuery criteria, IMongoSortBy sortBy = null);
+    long UpdateMany(IMongoQuery criteria, UpdateBuilder update, bool asUpsert = false);
+    long DeleteMany(IMongoQuery criteria);
+    void EnsureIndex(IMongoIndexKeys keys, IMongoIndexOptions options);
+}
+</code></pre>
+
+<ul>
+<li>Lambda-based property-name resolution for building MongoDB queries without using magic strings </li>
+</ul><pre><code>public IEnumerable&lt;Person&gt; GetByLastName(string LastName) {
+  // Instead of magic strings like this:
+  return Find(Query.EQ("LastName", LastName));
+  // Use Lambdas for Compile-time safety like this:
+  return Find(Query.EQ(PropertyName(p =&gt; p.LastName), LastName));
+  // Also works for collection members by using .Member()
+  string ChildLastNameField = PropertyName(p.Children.Member().LastName; // Evaluates to "Children.LastName"
+  return Find(Query.EQ(LastNameField, LastName)); // [NOTE: Returns the parent document]
+  // You can find the relative properties on a child object (without the parent prefix) using .Relative(), useful for $elemMatch
+  string LastNameField = PropertyName(p.Children.Relative().LastName; // Evaluates to "LastName" (without the "Children.")
+}
+</code></pre>
+
+<ul>
+<li>Simple connection-string configuration using native .NET operations. Users with a single mongodb:// connection string just work!</li>
+</ul><pre><code>&lt;connectionStrings&gt;
+    &lt;add key="MyCoolMongoDatabase" value="mongodb://hostname/database" /&gt; 
+&lt;/connectionStrings&gt;
+</code></pre>
+
+<ul>
+<li>A base-class from which strongly-typed documents can optionally inherit, providing string-typed Ids and automatic <strong>_id</strong> field population if saved as <strong>null</strong>.</li>
+</ul><pre><code>public class Person : Record {
+  public string FirstName { get; set; }
+  public string LastName { get; set; }
+  public Address Address { get; set; }
+  public Person[] Children { get; set; }
+}
+
+// Inherited from Record
+[BsonId(IdGenerator = typeof(StringObjectIdGenerator))]
+public virtual string Id { get; set; }
+</code></pre>
+
+<ul>
+<li>Another base-class (and interface) from which documents can inherit providing automatic maintenance of Creation/Modification timestamps.</li>
+</ul><pre><code>public class Person : ITimeStampedRecord {
+  #region ITimeStampedRecord Members
+  public DateTime CreatedDate { get; set; }
+  public DateTime ModifiedDate { get; set; }
+  #endregion
+}
+</code></pre>
+
+<ul>
+<li><p>A caching record manager to cache (by Id) retrieved instances of objects (useful for lookup collections)</p></li>
+<li><p>A set of convenience methods for interacting with MongoDB's new Aggregation Framework.</p></li>
+</ul><pre><code>... class ... : RecordManager {
+
+public Dictionary&lt;string,int&gt; CalculateVerseCountByBook() {
+  return base.Aggregate(
+            Aggregation.Group(
+                Aggregation.Grouping.By(PropertyName(x =&gt; x.Book)), 
+                Aggregation.Grouping.Count("Count")),
+            Aggregation.Sort(Aggregation.Sorting.By("Count", false))
+    ).ToDictionary(x =&gt; x[ID_FIELD].AsString, x =&gt; x["Count"].AsInt32);
+}
+</code></pre>
+
+<h2>Giving credit where credit is due</h2>
+
+<p>This project would not be possible without the amazing work done by Phillip Markert for Mongol. This project is
+derived from Mongol, with a few major infrastructure changes to make my life easier with it:</p>
+
+<ul>
+<li>Using native .NET connection strings instead of appSettings</li>
+<li>A DatabaseManager class that automatically creates RecordManager instances using the proper connection settings (inspired by EntityFramework) and schema migration (deleting non-requested indexes and provides easy way to remove deleted fields from project)</li>
+<li>Modernized against modern MongoDB C# driver</li>
+<li>Using log4net instead of Common logger</li>
+<li>Integration with IoC containers (when using DatabaseManager) -- DatabaseManager uses CommonServiceLocator to retreive RecordManager types for integration with your IoC container</li>
+</ul>
+      </section>
+    </div>
+
+    
+  </body>
+</html>
